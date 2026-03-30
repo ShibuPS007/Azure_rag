@@ -1,0 +1,40 @@
+{
+  "name": "rag-index",
+  "fields": [
+    { "name": "id", "type": "Edm.String", "key": true },
+
+    { "name": "document", "type": "Edm.String", "filterable": true, "searchable": true },
+
+    { "name": "content", "type": "Edm.String", "searchable": true },
+
+    { "name": "page", "type": "Edm.Int32", "filterable": true },
+
+    {
+      "name": "contentVector",
+      "type": "Collection(Edm.Single)",
+      "searchable": true,
+      "dimensions": 1536,
+      "vectorSearchProfile": "vector-profile"
+    }
+  ],
+  "vectorSearch": {
+    "profiles": [
+      {
+        "name": "vector-profile",
+        "algorithm": "vector-algorithm"
+      }
+    ],
+    "algorithms": [
+      {
+        "name": "vector-algorithm",
+        "kind": "hnsw",
+        "hnswParameters": {
+          "m": 4,
+          "efConstruction": 400,
+          "efSearch": 500,
+          "metric": "cosine"
+        }
+      }
+    ]
+  }
+}
