@@ -21,16 +21,16 @@ jobs:
     # building andd pushing backend
     - name: Build Backend Image
       run: |
-        docker build -t ${{ secrets.DOCKER_USERNAME }}/rag-backend ./backend
+        docker build -t ${{ secrets.DOCKER_USERNAME }}/rag-backend -f backend/Dockerfile .
 
     - name: Push Backend Image
       run: |
-        docker push ${{ secrets.DOCKER_USERNAME }}/rag-backend
+        docker push ${{ secrets.DOCKER_USERNAME }}/rag-backend 
 
     
     - name: Build Frontend Image
       run: |
-        docker build -t ${{ secrets.DOCKER_USERNAME }}/rag-frontend ./frontend
+        docker build -t ${{ secrets.DOCKER_USERNAME }}/rag-frontend -f frontend/Dockerfile .
 
     - name: Push Frontend Image
       run: |
