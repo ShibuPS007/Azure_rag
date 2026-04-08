@@ -1,6 +1,6 @@
-from embeddings import EmbeddingService
-from retrieval import AzureRetriever
-from qa_chain import QAChain
+from .embeddings import EmbeddingService
+from .retrieval import AzureRetriever
+from .qa_chain import QAChain
 
 embedder = EmbeddingService()
 retriever = AzureRetriever()

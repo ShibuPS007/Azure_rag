@@ -1,5 +1,5 @@
 from .state import AgentState
-from .tools import generate_answer,retrieve_docs,web_search
+from .tools import generate_answer,retrieve_docs,web_search,analyze_query_llm
 from backend.cloud_azure.qa_chain import QAChain
 
 qa=QAChain()
@@ -14,26 +14,26 @@ def router_agent(state:AgentState):
 
     # return {"source": "rag"}
 
-    prompt = f"""
-    Decide the best source:
+    # prompt = f"""
+    # Decide the best source:
 
-    - "rag" → if query involves document understanding (e.g., "this doc",or any other words asked related to the document uploaded)
-    - "web" → if query is ONLY about latest/current info
-    - If query has BOTH → ALWAYS choose "rag" first
+    # - "rag" → if query involves document understanding (e.g., "this doc",or any other words asked related to the document uploaded)
+    # - "web" → if query is ONLY about latest/current info
+    # - If query has BOTH → ALWAYS choose "rag" first
 
-    Query: {state.query}
+    # Query: {state.query}
 
-    Return ONLY one word: rag OR web
-    """
+    # Return ONLY one word: rag OR web
+    # """
 
-    decision = qa.generate_answer("",prompt).lower()
+    # decision = qa.generate_answer("",prompt).lower()
     
-    if "web" in decision:
-        source = "web"
-    else:
-        source = "rag"
+    # if "web" in decision:
+    #     source = "web"
+    # else:
+    #     source = "rag"
 
-    return {"source": source}
+    return {"source": "rag"}
 
 
 def rag_agent(state:AgentState):
@@ -41,39 +41,147 @@ def rag_agent(state:AgentState):
     docs,result=retrieve_docs(state.query,state.document_name)
 
     answer,context=generate_answer(docs,state.query)
-
+    analysis = analyze_query_llm(state.query, docs)
     return {
         "docs": docs,
         "context": context,
         "answer": answer,
         "source": "rag",
-        "sources": result
+        "sources": result,
+        "analysis":analysis
     }
 
 
-def web_agent(state:AgentState):
-    docs,sources= web_search(state.query)
+def hybrid_agent(state: AgentState):
 
-    context="\n\n".join(docs)
-    answer=qa.generate_answer(context,state.query)
+    
+    analysis = state.analysis or []
+
+    relevant_parts = [item["part"] for item in analysis
+        if item.get("relevance", "").lower() == "relevant"
+    ]
+
+    print(f"[HYBRID ANALYSIS] {analysis}")
+
+    if not relevant_parts:
+        return {
+            "answer": state.answer,
+            "source": "rag"
+        }
+
+    refined_query = " AND ".join(relevant_parts)
+
+    intent_prompt = f"""
+    Classify the query type:
+
+    Query: {refined_query}
+
+    Options:
+    - news
+    - general
+    - technical
+
+    Return ONLY one word.
+    """
+
+    intent = qa.generate_answer("", intent_prompt).strip().lower()
+
+    
+    search_query = refined_query
+
+    if intent == "news":
+        search_query += " latest trends 2026"
+    elif intent == "technical":
+        search_query += " detailed explanation"
+
+    
+    web_docs, web_sources = web_search(search_query)
+
+
+    filtered_docs = []
+    for doc in web_docs:
+        if doc and len(doc.split()) > 20:
+            filtered_docs.append(" ".join(doc.split()[:100]))
+
+    web_context = "\n\n".join(filtered_docs[:3])
+
+
+    # if not web_context.strip():
+    #     return {
+    #         "answer": state.answer,
+    #         "source": "rag"
+    #     }
+
+    prompt = f"""
+    Improve the document-based answer using web context.
+
+    Query:
+    {refined_query}
+
+    Document Answer:
+    {state.answer}
+
+    Web Context:
+    {web_context}
+
+    Instructions:
+    - Keep document answer as the base
+    - Use web info ONLY if it adds missing or recent details
+    - Do NOT answer unrelated parts
+    - Do NOT add external knowledge beyond web context
+    - Do NOT hallucinate
+    - Keep answer clean and structured
+    """
+
+    final_answer = qa.generate_answer("", prompt)
 
     return {
-        "answer": answer,
-        "source": "web",
-        "context":context,
-        "sources":sources
+        "answer": final_answer,
+        "source": "hybrid",
+        "sources": web_sources
     }
 
+
 def evaluator_agent(state:AgentState):
+    print(f"[STATE ANALYSIS IN EVALUATOR] {state.analysis}")
     query=state.query
     answer=state.answer
+    analysis = state.analysis
 
+    analysis = state.analysis or []
+
+    relevant_parts = [
+        item["part"]
+        for item in analysis
+        if item.get("relevance", "").lower() == "relevant"
+    ]
+
+    all_parts = [item["part"] for item in analysis]
+
+    print(f"[ANALYSIS] {analysis}")
+
+    
+    if len(relevant_parts) < len(all_parts):
+        print("Unrelated query parts detected -> restricting evaluation")
+
+        
+        query_to_evaluate = " AND ".join(relevant_parts)
+
+        if not query_to_evaluate:
+            
+            return {
+                "score": 0.0,
+                "decision": "accept",
+                "retry_count": state.retry_count + 1
+            }
+    else:
+        query_to_evaluate = query
     
 
     prompt = f"""
     Evaluate the answer quality.
 
-    Query: {query}
+    Query: {query_to_evaluate}
     Answer: {answer}
 
     Step 1: Identify how many parts the query has.
@@ -81,15 +189,14 @@ def evaluator_agent(state:AgentState):
     Step 3: Check if ALL parts are answered.
 
     CHECK:
-        - If query includes "recent", "latest", "new", or "current trends":
-        → answer MUST include general knowledge, not just document content
+        
         - If answer only uses document info for such parts → mark as incomplete
 
     IMPORTANT:
     - Check if ALL parts of the query are answered
-    - If any part is missing → DO NOT accept
-    - If partial → decision = combine
-    - If wrong → decision = fallback
+    - If any part is missing - DO NOT accept
+    - If partial -> decision = combine
+    - If wrong -> decision = fallback
     - Only if ALL parts are answered → "accept"
 
     Score from 0 to 1 based on:
@@ -97,10 +204,6 @@ def evaluator_agent(state:AgentState):
         - completeness (Very  Important)
         - correctness
 
-    SCORING:
-        - Missing part → max score 0.6
-        - Wrong interpretation → max score 0.6
-        - Fully correct → 0.8+
 
     Also return only an single word:
     decision: accept / combine / fallback
@@ -108,10 +211,6 @@ def evaluator_agent(state:AgentState):
     Format:
     score: <number>
     decision: <value>
-    
-    Example format:
-    score: 0.85
-    decision: accept
     """
 
     
@@ -147,68 +246,7 @@ def evaluator_agent(state:AgentState):
 
 
 
-def hybrid_agent(state:AgentState):
 
-    if state.source=="rag":
-        web_docs,web_source = web_search(state.query)
-
-        web_context="\n\n".join(web_docs)
-
-        
-        prompt = f"""
-        Combine the following two answers into one clear, non-redundant response.
-
-        Query:
-        {state.query}
-
-        Document Answer:
-        {state.answer}
-
-        Web Context:
-        {web_context}
-
-        Instructions:
-        - Merge both sources
-        - Remove repetition
-        - Keep it concise but complete
-        """
-        final_answer=qa.generate_answer("",prompt)
-        return {
-            "answer": final_answer,
-            "source": "hybrid",
-            "sources":web_source
-        }
-    elif state.source=="web":
-        docs,result=retrieve_docs(state.query,state.document_name)
-        rag_answer,context=generate_answer(docs,state.query)
-        prompt = f"""
-        Combine the following two answers into one clear, non-redundant response.
-
-        Query:
-        {state.query}
-
-        Web Answer:
-        {state.answer}
-
-        Document Context:
-        {context}
-
-        Instructions:
-        - Merge both sources
-        - Remove repetition
-        - Keep it concise but complete
-        """
-        final_result=qa.generate_answer("",prompt)
-
-        return{
-            "answer":final_result,
-            "source":"hybrid",
-        }
-    else:
-        return{
-            "answer":state.answer,
-            "source":state.source
-        }
 
 
 

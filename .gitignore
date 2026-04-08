@@ -1,3 +1,22 @@
+# Python
+__pycache__/
+*.pyc
+
+# Virtual env
+.venv/
+
+# Secrets
+.env
+
+# Logs
+logs.jsonl
+
+# Uploads
+uploads/
+
+# OS
+.DS_Store
+
 node_modules/
 .env
 *.log

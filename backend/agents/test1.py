@@ -21,26 +21,26 @@ exists = indexer.document_exists(doc_name)
 print("Exists:", exists)
 
 if not exists:
-    print("📥 Processing document...")
+    print(" Processing document...")
     process_document(pdf_bytes, doc_name)
 else:
-    print("✅ Document already indexed")
+    print("Document already indexed")
 
 
-# 🔥 TEST QUERY
+
 state = AgentState(
-    query="what is this doc and any recent new technology updates in devops?",
+    query="what is this document about ",
     document_name=doc_name
 )
 
 print("\n==============================")
-print("🧠 Query:", state.query)
+print(" Query:", state.query)
 
-# 🚀 RUN GRAPH
+
 result = graph.invoke(state)
 
 print("\n==============================")
-print("✅ FINAL RESULT:\n")
+print("FINAL RESULT:\n")
 
 print("Answer:", result["answer"])
 print("Source:", result.get("source"))

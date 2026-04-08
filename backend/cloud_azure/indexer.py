@@ -21,6 +21,7 @@ class AzureSearchIndexer:
         docs=[]
 
         for i,chunk in enumerate(embedded_chunks):
+            
             doc_id=f"{document_name}_p{chunk['page']}_c{i}"
             docs.append({
                 "id": doc_id,

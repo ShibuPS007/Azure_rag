@@ -1,0 +1,40 @@
+# Python
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+
+# Virtual environment
+.venv/
+venv/
+
+# Environment variables
+.env
+
+# Logs
+logs.jsonl
+*.log
+
+# Uploads / temp files
+uploads/
+temp/
+
+# Git
+.git
+.gitignore
+
+# OS files
+.DS_Store
+Thumbs.db
+
+# IDE
+.vscode/
+.idea/
+
+# Docker
+docker-compose.yml
+
+# Node (if any frontend later)
+node_modules/
+
+.pdf

@@ -1,14 +1,22 @@
 import streamlit as st
 import requests
+import os
+import uuid
 
-API_URL = "http://127.0.0.1:8000"
+if "session_id" not in st.session_state:
+    st.session_state.session_id = str(uuid.uuid4())
+
+
+API_URL = os.getenv("API_URL", "http://127.0.0.1:8000")
 
 st.set_page_config(page_title="Azure RAG Chatbot", layout="wide")
 st.title("Azure RAG Chatbot")
 
 uploaded_file = st.file_uploader("📤 Upload a PDF", type=["pdf"])
+
 if st.button("🧹 Clear Chat"):
     st.session_state.messages = []
+    st.session_state.session_id = str(uuid.uuid4())
 
 if uploaded_file is not None:
     if (
@@ -70,7 +78,8 @@ if query:
             f"{API_URL}/ask",
             json={
                 "query": query,
-                "document_name": document_name
+                "document_name": document_name,
+                "session_id": st.session_state.session_id
             }
         )
 

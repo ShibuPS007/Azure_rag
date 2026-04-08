@@ -20,7 +20,7 @@ class AzureRetriever:
             credential=AzureKeyCredential(key)
         )
 
-    def search(self, query_embedding, top_k=3, document_name=None):
+    def search(self,query_text, query_embedding, top_k=3, document_name=None):
 
         vector_query = VectorizedQuery(
             vector=query_embedding,
@@ -33,7 +33,7 @@ class AzureRetriever:
             filter_query = f"document eq '{document_name}'"
 
         results = self.client.search(
-            search_text="*",
+            search_text=query_text,
             vector_queries=[vector_query],
             filter=filter_query,
             top=top_k
