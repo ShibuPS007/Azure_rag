@@ -10,7 +10,7 @@ if "session_id" not in st.session_state:
 API_URL = os.getenv("API_URL", "http://127.0.0.1:8000")
 
 st.set_page_config(page_title="Azure RAG Chatbot", layout="wide")
-st.title("Azure RAG Chatbot")
+st.title("Azure RAG Chatbots")
 
 uploaded_file = st.file_uploader("📤 Upload a PDF", type=["pdf"])
 
